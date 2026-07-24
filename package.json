@@ -1,0 +1,23 @@
+{
+  "name": "bugbountylabs",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "private": true,
+  "type": "module",
+  "packages": {},
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^6.4.3"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.1"
+  }
+}
