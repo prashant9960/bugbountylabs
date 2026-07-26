@@ -3,6 +3,7 @@ import Home from './pages/Home';
 import PriceManipulation from './labs/PriceManipulation';
 import NotFound from './pages/Notfound';
 import OtpBypass from './labs/OtpBypass';
+import IdorOrder from './labs/IdorOrder';
 
 export default function App() {
   return (
@@ -15,6 +16,8 @@ export default function App() {
         <Route path="/PriceManipulation" element={<PriceManipulation />} />
        
         <Route path="/OtpBypass" element={<OtpBypass />} />
+
+        <Route path="/IdorOrder" element={<IdorOrder />} />
 
         {/* Catch-all 404 page */}
         <Route path="*" element={<NotFound />} />

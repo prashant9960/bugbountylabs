@@ -1,16 +1,11 @@
 {
   "rewrites": [
-    { 
-      "source": "/api/(.*)", 
-      "destination": "/api/$1" 
-    },
-    { 
-      "source": "/PriceManipulation", 
-      "destination": "/index.html" 
-    },
-    { 
-      "source": "/OtpBypass", 
-      "destination": "/index.html" 
-    }
+    { "source": "/api/orders/:id/cancel", "destination": "/api/orders-lab?action=cancel&id=:id" },
+    { "source": "/api/orders/:id", "destination": "/api/orders-lab?id=:id" },
+    { "source": "/api/check-progress", "destination": "/api/orders-lab?action=check" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/PriceManipulation", "destination": "/index.html" },
+    { "source": "/OtpBypass", "destination": "/index.html" },
+    { "source": "/IdorOrder", "destination": "/index.html" }
   ]
 }
