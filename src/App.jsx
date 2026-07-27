@@ -4,6 +4,7 @@ import PriceManipulation from './labs/PriceManipulation';
 import NotFound from './pages/Notfound';
 import OtpBypass from './labs/OtpBypass';
 import IdorOrder from './labs/IdorOrder';
+import GraphqlProfile from './labs/GraphqlProfile';
 
 export default function App() {
   return (
@@ -18,6 +19,8 @@ export default function App() {
         <Route path="/OtpBypass" element={<OtpBypass />} />
 
         <Route path="/IdorOrder" element={<IdorOrder />} />
+
+        <Route path="/GraphqlProfile" element={<GraphqlProfile />} />
 
         {/* Catch-all 404 page */}
         <Route path="*" element={<NotFound />} />
