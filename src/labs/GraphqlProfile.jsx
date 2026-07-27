@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 
-// Upgraded Syntax Highlighter to create the glowing dopamine hit
 const SyntaxHighlight = ({ data, highlightKeys = [] }) => {
   if (!data) return null;
   const jsonString = JSON.stringify(data, null, 2);
@@ -11,10 +10,9 @@ const SyntaxHighlight = ({ data, highlightKeys = [] }) => {
       let cls = 'text-green-400'; 
       if (/^"/.test(match)) {
         if (/:$/.test(match)) {
-          // Extract the exact key name without quotes and colon
           const rawKey = match.replace(/[":]/g, '');
-          if (highlightKeys.includes(rawKey)) {
-            // The massive visual payoff: Glowing red/pink for leaked internal fields
+          // Target leaked fields AND the "errors" array for highlighting
+          if (highlightKeys.includes(rawKey) || rawKey === 'errors' || rawKey === 'message') {
             cls = 'text-pink-500 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] font-bold';
           } else {
             cls = 'text-blue-400';
@@ -35,11 +33,11 @@ const SyntaxHighlight = ({ data, highlightKeys = [] }) => {
 
 export default function GraphqlProfile() {
   const [profileData, setProfileData] = useState(null);
-  
   const [executedQuery, setExecutedQuery] = useState("");
   const [rawResponse, setRawResponse] = useState(null);
   const [leakedKeys, setLeakedKeys] = useState([]);
   const [queryStatus, setQueryStatus] = useState("Idle");
+  const [isExploited, setIsExploited] = useState(false);
   
   const [isVerifying, setIsVerifying] = useState(false);
   const [showFlagModal, setShowFlagModal] = useState(false);
@@ -52,14 +50,12 @@ export default function GraphqlProfile() {
   const fetchProfile = async () => {
     setQueryStatus("Awaiting Network...");
     
+    // Spoilers removed. The learner relies entirely on curiosity or the Reel.
     const defaultQuery = `query {
   me {
     name
     email
     membership
-
-    # 💡 Intercept this request in Burp
-    # and discover hidden fields here
   }
 }`;
     
@@ -84,11 +80,14 @@ export default function GraphqlProfile() {
           if (data.extensions?.providedQuery) {
             setExecutedQuery(data.extensions.providedQuery);
           }
-          if (data.extensions?.leakedFields) {
+          if (data.extensions?.leakedFields?.length > 0) {
             setLeakedKeys(data.extensions.leakedFields);
+            setIsExploited(true);
+          } else {
+            setIsExploited(false);
+            setLeakedKeys([]);
           }
           
-          // UI ignores extra data. UI != Backend.
           if (data.data?.me) {
             setProfileData({
               name: data.data.me.name,
@@ -139,7 +138,6 @@ export default function GraphqlProfile() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
         
-        {/* Left Column: Fixed UI & Controls */}
         <div className="lg:col-span-4 space-y-6 flex flex-col">
           <h2 className="text-lg font-bold text-gray-800 px-1">My Profile</h2>
           
@@ -185,7 +183,6 @@ export default function GraphqlProfile() {
           </div>
         </div>
 
-        {/* Right Column: GraphQL Dual-Pane */}
         <div className="lg:col-span-8 flex flex-col">
           <div className="flex justify-between items-center mb-2 px-1">
             <h2 className="text-lg font-bold text-gray-800 flex items-center">
@@ -200,8 +197,8 @@ export default function GraphqlProfile() {
           
           <div className="bg-[#1e1e1e] rounded-xl shadow-lg border border-gray-800 overflow-hidden flex flex-col h-[700px] relative">
             
-            {/* ⚠️ THE EXPOSURE BADGE */}
-            {leakedKeys.length > 0 && queryStatus === "Complete" && (
+            {/* The Cinematic Badge Payload */}
+            {isExploited && queryStatus === "Complete" && (
               <div className="absolute top-12 left-1/2 transform -translate-x-1/2 z-10 animate-fade-in-up">
                 <div className="bg-black/80 border border-green-500/50 text-green-400 text-xs font-bold px-4 py-1.5 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.3)] flex items-center gap-2 backdrop-blur-sm">
                   <span className="animate-pulse text-sm">⚠️</span> Excessive Data Exposure Detected
@@ -217,7 +214,6 @@ export default function GraphqlProfile() {
             </div>
 
             <div className="flex flex-1 overflow-hidden">
-              {/* Left Pane: Sent Query (Now dynamically matches Burp) */}
               <div className="w-5/12 border-r border-gray-700 bg-[#1e1e1e] flex flex-col">
                 <div className="bg-[#252526] text-gray-400 text-[10px] font-bold uppercase tracking-widest px-4 py-1.5 border-b border-gray-700">
                   Request Query
@@ -227,8 +223,8 @@ export default function GraphqlProfile() {
                 </div>
               </div>
 
-              {/* Right Pane: Exploding Response */}
-              <div className="w-7/12 bg-[#1e1e1e] flex flex-col">
+              {/* Dynamic Glow Pane on Exploit */}
+              <div className={`w-7/12 bg-[#1e1e1e] flex flex-col transition-all duration-700 ${isExploited && queryStatus === "Complete" ? 'ring-inset ring-2 ring-pink-500/30 shadow-[inset_0_0_50px_rgba(236,72,153,0.1)]' : ''}`}>
                 <div className="bg-[#252526] text-gray-400 text-[10px] font-bold uppercase tracking-widest px-4 py-1.5 border-b border-gray-700">
                   Server Response
                 </div>
