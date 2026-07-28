@@ -5,6 +5,7 @@ import NotFound from './pages/Notfound';
 import OtpBypass from './labs/OtpBypass';
 import IdorOrder from './labs/IdorOrder';
 import GraphqlProfile from './labs/GraphqlProfile';
+import ReflectedXss from './labs/ReflectedXss';
 
 export default function App() {
   return (
@@ -21,6 +22,8 @@ export default function App() {
         <Route path="/IdorOrder" element={<IdorOrder />} />
 
         <Route path="/GraphqlProfile" element={<GraphqlProfile />} />
+
+        <Route path="/ReflectedXss" element={<ReflectedXss />} />
 
         {/* Catch-all 404 page */}
         <Route path="*" element={<NotFound />} />

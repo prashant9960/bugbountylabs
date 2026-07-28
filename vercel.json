@@ -1,17 +1,18 @@
 {
   "rewrites": [
+    { "source": "/api/search-xss", "destination": "/api/search-xss" },
+    { "source": "/api/check-xss-progress", "destination": "/api/check-xss-progress" },
     { "source": "/api/orders/cancel", "destination": "/api/orders-lab?action=cancel" },
     { "source": "/api/orders/:id", "destination": "/api/orders-lab?id=:id" },
     { "source": "/api/check-progress", "destination": "/api/orders-lab?action=check" },
-    
     { "source": "/api/check-graphql-progress", "destination": "/api/check-graphql-progress" },
     { "source": "/api/graphql", "destination": "/api/graphql" },
-    
     { "source": "/api/(.*)", "destination": "/api/$1" },
     
     { "source": "/PriceManipulation", "destination": "/index.html" },
     { "source": "/OtpBypass", "destination": "/index.html" },
     { "source": "/IdorOrder", "destination": "/index.html" },
-    { "source": "/GraphqlProfile", "destination": "/index.html" }
+    { "source": "/GraphqlProfile", "destination": "/index.html" },
+    { "source": "/ReflectedXss", "destination": "/index.html" }
   ]
 }
