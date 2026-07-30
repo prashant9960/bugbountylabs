@@ -1,5 +1,8 @@
 {
   "rewrites": [
+    { "source": "/api/book-seat", "destination": "/api/book-seat" },
+    { "source": "/api/check-race-progress", "destination": "/api/check-race-progress" },
+    
     { "source": "/api/search-xss", "destination": "/api/search-xss" },
     { "source": "/api/check-xss-progress", "destination": "/api/check-xss-progress" },
     { "source": "/api/orders/cancel", "destination": "/api/orders-lab?action=cancel" },
@@ -7,12 +10,14 @@
     { "source": "/api/check-progress", "destination": "/api/orders-lab?action=check" },
     { "source": "/api/check-graphql-progress", "destination": "/api/check-graphql-progress" },
     { "source": "/api/graphql", "destination": "/api/graphql" },
+    
     { "source": "/api/(.*)", "destination": "/api/$1" },
     
     { "source": "/PriceManipulation", "destination": "/index.html" },
     { "source": "/OtpBypass", "destination": "/index.html" },
     { "source": "/IdorOrder", "destination": "/index.html" },
     { "source": "/GraphqlProfile", "destination": "/index.html" },
-    { "source": "/ReflectedXss", "destination": "/index.html" }
+    { "source": "/ReflectedXss", "destination": "/index.html" },
+    { "source": "/RaceCondition", "destination": "/index.html" }
   ]
 }

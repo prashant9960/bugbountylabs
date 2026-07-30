@@ -6,6 +6,7 @@ import OtpBypass from './labs/OtpBypass';
 import IdorOrder from './labs/IdorOrder';
 import GraphqlProfile from './labs/GraphqlProfile';
 import ReflectedXss from './labs/ReflectedXss';
+import RaceCondition from './labs/RaceCondition';
 
 export default function App() {
   return (
@@ -24,6 +25,8 @@ export default function App() {
         <Route path="/GraphqlProfile" element={<GraphqlProfile />} />
 
         <Route path="/ReflectedXss" element={<ReflectedXss />} />
+
+        <Route path="/RaceCondition" element={<RaceCondition />} />
 
         {/* Catch-all 404 page */}
         <Route path="*" element={<NotFound />} />
