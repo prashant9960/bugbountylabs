@@ -92,16 +92,29 @@ export default function RaceCondition() {
     setIsAttacking(true);
     setAttackLog([{ time: new Date().toLocaleTimeString(), msg: "Turbo Intruder Initialized." }]);
     
+    // FIX 1: Automatically clear the database before attacking so the seat is ALWAYS available.
+    await fetch("/api/book-seat", { method: "DELETE" });
+    
     setTimeout(() => {
       setAttackLog(prev => [...prev, { time: new Date().toLocaleTimeString(), msg: "Firing 2 requests simultaneously..." }]);
     }, 500);
 
-    // The Exploit: Promise.all dispatches both network requests at the EXACT same time.
+    // FIX 2: Added cache: "no-store" and unique timestamps so the browser cannot queue them.
     setTimeout(async () => {
       try {
         const [res1, res2] = await Promise.all([
-          fetch("/api/book-seat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: "User A" }) }),
-          fetch("/api/book-seat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: "User B" }) })
+          fetch(`/api/book-seat?thread=1&ts=${Date.now()}`, { 
+            method: "POST", 
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ user: "User A" }) 
+          }),
+          fetch(`/api/book-seat?thread=2&ts=${Date.now()}`, { 
+            method: "POST", 
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ user: "User B" }) 
+          })
         ]);
 
         const data1 = await res1.json();
