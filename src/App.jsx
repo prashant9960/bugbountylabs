@@ -7,6 +7,7 @@ import IdorOrder from './labs/IdorOrder';
 import GraphqlProfile from './labs/GraphqlProfile';
 import ReflectedXss from './labs/ReflectedXss';
 import RaceCondition from './labs/RaceCondition';
+import PreATO from './labs/PreATO';
 
 export default function App() {
   return (
@@ -27,6 +28,8 @@ export default function App() {
         <Route path="/ReflectedXss" element={<ReflectedXss />} />
 
         <Route path="/RaceCondition" element={<RaceCondition />} />
+
+        <Route path="/PreATO" element={<PreATO />} />
 
         {/* Catch-all 404 page */}
         <Route path="*" element={<NotFound />} />

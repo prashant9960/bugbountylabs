@@ -12,6 +12,7 @@ import ordersLab from '../backend/orders-lab.js';
 import searchXss from '../backend/search-xss.js';
 import trackOrder from '../backend/track-order.js';
 import verifyOtp from '../backend/verify-otp.js';
+import handlePreATO from '../backend/pre-ato.js';
 
 export default async function handler(req, res) {
   // Extract the base URL without query parameters
@@ -37,6 +38,9 @@ export default async function handler(req, res) {
   // Handle dynamic routing for the IDOR lab (e.g., /api/orders/5001)
   if (urlPath.startsWith('/api/orders/')) {
     return ordersLab(req, res);
+  }
+  if (urlPath === '/api/pre-ato' || urlPath === '/api/check-pre-ato-progress') {
+    return handlePreATO(req, res);
   }
 
   // Fallback

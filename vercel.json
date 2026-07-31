@@ -7,6 +7,7 @@
     { "source": "/IdorOrder", "destination": "/index.html" },
     { "source": "/GraphqlProfile", "destination": "/index.html" },
     { "source": "/ReflectedXss", "destination": "/index.html" },
-    { "source": "/RaceCondition", "destination": "/index.html" }
+    { "source": "/RaceCondition", "destination": "/index.html" },
+    { "source": "/PreATO", "destination": "/index.html" }
   ]
 }
