@@ -9,6 +9,7 @@ import ReflectedXss from './labs/ReflectedXss';
 import RaceCondition from './labs/RaceCondition';
 import PreATO from './labs/PreATO';
 import SubdomainTakeover from './labs/SubdomainTakeover';
+import InfoDisclosure from './labs/InfoDisclosure';
 
 export default function App() {
   return (
@@ -31,8 +32,10 @@ export default function App() {
         <Route path="/RaceCondition" element={<RaceCondition />} />
 
         <Route path="/PreATO" element={<PreATO />} />
-        
+
         <Route path="/SubdomainTakeover" element={<SubdomainTakeover />} />
+        
+        <Route path="/InfoDisclosure" element={<InfoDisclosure />} />
 
         {/* Catch-all 404 page */}
         <Route path="*" element={<NotFound />} />
