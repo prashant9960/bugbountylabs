@@ -11,6 +11,7 @@
     { "source": "/PreATO", "destination": "/index.html" },
     { "source": "/CaptchaFailOpen", "destination": "/index.html" },
     { "source": "/SubdomainTakeover", "destination": "/index.html" },
-    { "source": "/InfoDisclosure", "destination": "/index.html" }
+    { "source": "/InfoDisclosure", "destination": "/index.html" },
+    { "source": "/JwtAlgNone", "destination": "/index.html" }
   ]
 }

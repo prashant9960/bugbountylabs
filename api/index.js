@@ -16,6 +16,7 @@ import handlePreATO from '../backend/pre-ato.js';
 import handleCaptchaFailOpen from '../backend/captcha-fail-open.js';
 import handleSubdomainTakeover from '../backend/subdomain-takeover.js';
 import handleInfoDisclosure from '../backend/info-disclosure.js';
+import handleJwtAlgNone from '../backend/jwt-alg-none.js';
 
 export default async function handler(req, res) {
   // Extract the base URL without query parameters
@@ -53,6 +54,9 @@ export default async function handler(req, res) {
   }
   if (urlPath === '/api/info-disclosure') {
     return handleInfoDisclosure(req, res);
+  }
+  if (urlPath === '/api/jwt-alg-none') {
+    return handleJwtAlgNone(req, res);
   }
   // Fallback
   return res.status(404).json({ error: "API Endpoint not found." });

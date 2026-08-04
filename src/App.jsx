@@ -10,6 +10,7 @@ import RaceCondition from './labs/RaceCondition';
 import PreATO from './labs/PreATO';
 import SubdomainTakeover from './labs/SubdomainTakeover';
 import InfoDisclosure from './labs/InfoDisclosure';
+import JwtAlgNone from './labs/JwtAlgNone';
 
 export default function App() {
   return (
@@ -36,6 +37,8 @@ export default function App() {
         <Route path="/SubdomainTakeover" element={<SubdomainTakeover />} />
         
         <Route path="/InfoDisclosure" element={<InfoDisclosure />} />
+
+        <Route path="/JwtAlgNone" element={<JwtAlgNone />} />
 
         {/* Catch-all 404 page */}
         <Route path="*" element={<NotFound />} />
