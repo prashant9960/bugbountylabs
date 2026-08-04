@@ -1,4 +1,4 @@
-// Clean timeline tracking
+// Clean, single-source-of-truth timeline tracking
 const TIMELINE = {
     LOGIN: 1,
     JWT_ISSUED: 2,
@@ -11,21 +11,38 @@ const TIMELINE = {
     EXPLAIN: 9
   };
   
-  // Shared memory for serverless (resets on cold start)
-  global.jwtAlgNoneLab = global.jwtAlgNoneLab || {
-    timelineStep: TIMELINE.LOGIN,
-    headerModified: false,
-    signatureRemoved: false,
-    predictionMade: null,
-    accessGranted: false
+  // SIMULATED REDIS / DB SESSION STORE
+  // In production, this maps to a real DB or Redis instance keyed by session cookie/token.
+  const sessionStore = new Map();
+  
+  const getSession = (sessionId) => {
+    if (!sessionStore.has(sessionId)) {
+      sessionStore.set(sessionId, {
+        timelineStep: TIMELINE.LOGIN,
+        scene: 'LOGIN',
+        headerModified: false,
+        signatureRemoved: false,
+        predictionMade: null,
+        accessGranted: false
+      });
+    }
+    return sessionStore.get(sessionId);
   };
   
   export default async function handleJwtAlgNone(req, res) {
     const { action } = req.query;
+    const sessionId = req.headers['x-session-id'];
   
-    // 1. VERIFICATION ENDPOINT (Strictly read-only)
+    if (!sessionId) {
+      return res.status(401).json({ error: "Missing Session ID" });
+    }
+  
+    const session = getSession(sessionId);
+  
+    // 1. VERIFICATION ENDPOINT (Strictly read-only, backend-enforced)
     if (action === 'verify') {
-      if (global.jwtAlgNoneLab.timelineStep >= TIMELINE.EXPLAIN) {
+      // Prevent skipping: Learner must have reached the explanation to verify
+      if (session.timelineStep >= TIMELINE.EXPLAIN) {
         return res.status(200).json({ complete: true, flag: "FLAG{never_trust_client_algorithm}" });
       }
       return res.status(200).json({ complete: false });
@@ -33,19 +50,20 @@ const TIMELINE = {
   
     // 2. RESET ENDPOINT
     if (req.method === 'DELETE') {
-      global.jwtAlgNoneLab = {
+      sessionStore.set(sessionId, {
         timelineStep: TIMELINE.LOGIN,
+        scene: 'LOGIN',
         headerModified: false,
         signatureRemoved: false,
         predictionMade: null,
         accessGranted: false
-      };
+      });
       return res.status(200).json({ success: true, message: "Lab Reset" });
     }
   
     // 3. GET STATE
     if (req.method === 'GET') {
-      return res.status(200).json(global.jwtAlgNoneLab);
+      return res.status(200).json(session);
     }
   
     // 4. BUSINESS LOGIC ENDPOINTS
@@ -53,85 +71,91 @@ const TIMELINE = {
       const { type, payload } = req.body;
   
       if (type === 'LOGIN') {
-        global.jwtAlgNoneLab.timelineStep = TIMELINE.JWT_ISSUED;
-        return res.status(200).json({ success: true, state: global.jwtAlgNoneLab });
+        session.timelineStep = TIMELINE.JWT_ISSUED;
+        session.scene = 'INSPECT';
+        return res.status(200).json({ success: true, state: session });
       }
   
-      // Real-time timeline updates as the user edits the token
       if (type === 'MARK_HEADER_MODIFIED') {
-        global.jwtAlgNoneLab.headerModified = true;
-        if (global.jwtAlgNoneLab.timelineStep < TIMELINE.HEADER_MODIFIED) {
-          global.jwtAlgNoneLab.timelineStep = TIMELINE.HEADER_MODIFIED;
+        session.headerModified = true;
+        if (session.timelineStep < TIMELINE.HEADER_MODIFIED) {
+          session.timelineStep = TIMELINE.HEADER_MODIFIED;
         }
-        return res.status(200).json({ success: true, state: global.jwtAlgNoneLab });
+        return res.status(200).json({ success: true, state: session });
       }
   
       if (type === 'MARK_SIG_REMOVED') {
-        global.jwtAlgNoneLab.signatureRemoved = true;
-        if (global.jwtAlgNoneLab.timelineStep < TIMELINE.SIG_REMOVED) {
-          global.jwtAlgNoneLab.timelineStep = TIMELINE.SIG_REMOVED;
+        session.signatureRemoved = true;
+        if (session.timelineStep < TIMELINE.SIG_REMOVED) {
+          session.timelineStep = TIMELINE.SIG_REMOVED;
         }
-        return res.status(200).json({ success: true, state: global.jwtAlgNoneLab });
+        return res.status(200).json({ success: true, state: session });
       }
   
       if (type === 'MAKE_PREDICTION') {
-        global.jwtAlgNoneLab.predictionMade = payload.prediction;
-        global.jwtAlgNoneLab.timelineStep = TIMELINE.PREDICTION;
-        return res.status(200).json({ success: true, state: global.jwtAlgNoneLab });
+        session.predictionMade = payload.prediction;
+        session.timelineStep = TIMELINE.PREDICTION;
+        session.scene = 'FORWARDING_UI';
+        return res.status(200).json({ success: true, state: session });
       }
   
       if (type === 'FORWARD_REQUEST') {
-        global.jwtAlgNoneLab.timelineStep = TIMELINE.FORWARDED;
+        // Prevent skipping straight to forward without logging in
+        if (session.timelineStep < TIMELINE.JWT_ISSUED) {
+          return res.status(403).json({ error: true, message: "Invalid sequence." });
+        }
+  
+        session.timelineStep = TIMELINE.FORWARDED;
         
         try {
           const { header, signature } = payload;
           const parsedHeader = JSON.parse(header);
   
           // ❌ INTENTIONALLY VULNERABLE: ALGORITHM CONFUSION
-          // The server trusts the client's 'alg' header.
-          // It does NOT check the payload. Payload manipulation is irrelevant here.
           if (parsedHeader.alg && parsedHeader.alg.toLowerCase() === 'none') {
             if (signature.trim() === '') {
-              // Verification Skipped!
-              global.jwtAlgNoneLab.accessGranted = true;
-              global.jwtAlgNoneLab.timelineStep = TIMELINE.VERIFICATION_SKIPPED;
+              session.accessGranted = true;
+              session.timelineStep = TIMELINE.ADMIN_ACCESS; 
+              session.scene = 'DASHBOARD';
               
-              // Advance to Admin Access after a micro-delay in UI, but set state now
               return res.status(200).json({ 
                 success: true, 
-                status: "Verification Skipped",
-                state: global.jwtAlgNoneLab 
+                status: "Admin Access Granted",
+                state: session 
               });
             } else {
-              // They changed to 'none' but left the signature intact.
               return res.status(401).json({ 
                 error: true, 
-                message: "Invalid signature format for alg:none",
-                state: global.jwtAlgNoneLab 
+                message: "Server rejected token. Signature found but alg is none.",
+                state: session 
               });
             }
           }
           
-          // Expected secure behavior if they didn't change the algorithm
+          // Guided Failure Message (Instead of generic "Invalid signature")
           return res.status(401).json({ 
             error: true, 
-            message: "Signature verification failed. Invalid signature.",
-            state: global.jwtAlgNoneLab 
+            message: "Server rejected this token. Think again. What does 'alg' tell the server?",
+            state: session 
           });
   
         } catch (e) {
-          return res.status(400).json({ error: true, message: "Malformed Header JSON", state: global.jwtAlgNoneLab });
+          return res.status(400).json({ 
+            error: true, 
+            message: "Request couldn't be parsed. Fix the JSON syntax first.", 
+            state: session 
+          });
         }
       }
   
-      if (type === 'GRANT_ADMIN') {
-        global.jwtAlgNoneLab.timelineStep = TIMELINE.ADMIN_ACCESS;
-        return res.status(200).json({ success: true, state: global.jwtAlgNoneLab });
-      }
-  
       if (type === 'BEGIN_EXPLANATION') {
-        global.jwtAlgNoneLab.timelineStep = TIMELINE.EXPLAIN;
-        return res.status(200).json({ success: true, state: global.jwtAlgNoneLab });
+        // Prevent skipping straight to explanation
+        if (!session.accessGranted) {
+          return res.status(403).json({ error: true, message: "Solve the lab first." });
+        }
+        session.timelineStep = TIMELINE.EXPLAIN;
+        session.scene = 'EXPLAIN';
+        return res.status(200).json({ success: true, state: session });
       }
     }
   

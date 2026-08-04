@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 
+// Simple UUID generator for stateless session management simulation
+const generateSessionId = () => Math.random().toString(36).substring(2, 15);
+
 export default function JwtAlgNone() {
+  const [sessionId, setSessionId] = useState('');
   const [labState, setLabState] = useState(null);
+  
+  // Scene Management
   const [scene, setScene] = useState('LOGIN'); 
   const [isResetting, setIsResetting] = useState(false);
   const [toast, setToast] = useState(null);
@@ -12,58 +18,94 @@ export default function JwtAlgNone() {
   const defaultSignature = 'SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
 
   const [jwtHeader, setJwtHeader] = useState(defaultHeader);
-  const [jwtPayload, setJwtPayload] = useState(defaultPayload);
+  const [jwtPayload] = useState(defaultPayload); // Static
   const [jwtSignature, setJwtSignature] = useState(defaultSignature);
   
+  // Interaction tracking (Prevents API spam)
+  const [hasModifiedHeader, setHasModifiedHeader] = useState(false);
+  const [hasRemovedSig, setHasRemovedSig] = useState(false);
+
+  // Micro-states for enhanced realism
+  const [loginText, setLoginText] = useState('Login to Workspace');
+  const [forwardingText, setForwardingText] = useState('Forwarding Request...');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isForwarding, setIsForwarding] = useState(false);
+  const [isReplaying, setIsReplaying] = useState(false);
   
   // Cinematic Animations
   const [dialogueStep, setDialogueStep] = useState(0);
   const [explainStep, setExplainStep] = useState(0);
+  const [flowAnim, setFlowAnim] = useState(0);
   
   // Quiz & Verification
   const [selectedAnswer, setSelectedAnswer] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [showFlagModal, setShowFlagModal] = useState(false);
-  const [flag, setFlag] = useState("");
 
+  // Initialize Session
   useEffect(() => {
-    fetchState();
+    let id = localStorage.getItem('hunter_session_jwt');
+    if (!id) {
+      id = generateSessionId();
+      localStorage.setItem('hunter_session_jwt', id);
+    }
+    setSessionId(id);
   }, []);
 
-  // Track user edits for the timeline
+  // Fetch state once session is ready
   useEffect(() => {
-    if (scene === 'INSPECT') {
-      if (jwtHeader !== defaultHeader) {
-        fetch("/api/jwt-alg-none", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: 'MARK_HEADER_MODIFIED' }) }).then(fetchState);
-      }
+    if (sessionId) fetchState(true);
+  }, [sessionId]);
+
+  const apiFetch = async (endpoint, options = {}) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Session-ID': sessionId,
+      ...(options.headers || {})
+    };
+    return fetch(endpoint, { ...options, headers });
+  };
+
+  // Track user edits for the timeline ONCE
+  useEffect(() => {
+    if (scene === 'INSPECT' && !hasModifiedHeader && jwtHeader !== defaultHeader) {
+      setHasModifiedHeader(true);
+      if (!isReplaying) apiFetch("/api/jwt-alg-none", { method: "POST", body: JSON.stringify({ type: 'MARK_HEADER_MODIFIED' }) }).then(() => fetchState(false));
     }
-  }, [jwtHeader]);
+  }, [jwtHeader, scene, hasModifiedHeader, isReplaying]);
 
   useEffect(() => {
-    if (scene === 'INSPECT') {
-      if (jwtSignature !== defaultSignature && jwtSignature.trim() === '') {
-        fetch("/api/jwt-alg-none", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: 'MARK_SIG_REMOVED' }) }).then(fetchState);
-      }
+    if (scene === 'INSPECT' && !hasRemovedSig && jwtSignature !== defaultSignature && jwtSignature.trim() === '') {
+      setHasRemovedSig(true);
+      if (!isReplaying) apiFetch("/api/jwt-alg-none", { method: "POST", body: JSON.stringify({ type: 'MARK_SIG_REMOVED' }) }).then(() => fetchState(false));
     }
-  }, [jwtSignature]);
+  }, [jwtSignature, scene, hasRemovedSig, isReplaying]);
 
-  // Dialogue Animation Progression
+  // Dialogue & Flow Animations
   useEffect(() => {
     if (scene === 'EXPLAIN' && explainStep === 0) {
       setDialogueStep(0);
-      const t1 = setTimeout(() => setDialogueStep(1), 800);  // Server asks
-      const t2 = setTimeout(() => setDialogueStep(2), 2500); // JWT replies
-      const t3 = setTimeout(() => setDialogueStep(3), 4000); // Server accepts
+      const t1 = setTimeout(() => setDialogueStep(1), 800);
+      const t2 = setTimeout(() => setDialogueStep(2), 2500);
+      const t3 = setTimeout(() => setDialogueStep(3), 4000);
       return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    }
+    if (scene === 'EXPLAIN' && explainStep === 1) {
+      setFlowAnim(0);
+      const timers = [1,2,3,4,5,6,7].map(i => setTimeout(() => setFlowAnim(i), i * 600));
+      return () => timers.forEach(clearTimeout);
     }
   }, [scene, explainStep]);
 
-  const fetchState = async () => {
+  const fetchState = async (syncScene = false) => {
     try {
-      const res = await fetch("/api/jwt-alg-none");
+      const res = await apiFetch("/api/jwt-alg-none");
       const data = await res.json();
       setLabState(data);
+      
+      if (syncScene && !isResetting && !isReplaying && data.scene) {
+        setScene(data.scene);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -71,116 +113,99 @@ export default function JwtAlgNone() {
 
   const showToast = (message, type = 'default') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   };
 
-  const resetLab = async () => {
-    setIsResetting(true);
-    await fetch("/api/jwt-alg-none", { method: "DELETE" });
+  const resetLab = async (silent = false) => {
+    if (!silent) setIsResetting(true);
+    await apiFetch("/api/jwt-alg-none", { method: "DELETE" });
     
     setScene('LOGIN');
     setJwtHeader(defaultHeader);
-    setJwtPayload(defaultPayload);
     setJwtSignature(defaultSignature);
+    setHasModifiedHeader(false);
+    setHasRemovedSig(false);
+    setLoginText('Login to Workspace');
     setExplainStep(0);
     setDialogueStep(0);
+    setFlowAnim(0);
     setSelectedAnswer("");
-    await fetchState();
+    setShowFlagModal(false);
+    await fetchState(false);
 
-    setTimeout(() => setIsResetting(false), 400);
+    if (!silent) setTimeout(() => setIsResetting(false), 400);
   };
 
   // --- SCENE ACTIONS ---
 
   const handleLogin = async (e) => {
-    e.preventDefault();
+    if(e) e.preventDefault();
     setIsAuthenticating(true);
+    setLoginText('Authenticating...');
     
-    await fetch("/api/jwt-alg-none", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: 'LOGIN' })
-    });
-    await fetchState();
+    await apiFetch("/api/jwt-alg-none", { method: "POST", body: JSON.stringify({ type: 'LOGIN' }) });
+    await fetchState(false);
 
+    setTimeout(() => setLoginText('JWT Generated...'), 600);
     setTimeout(() => {
       setIsAuthenticating(false);
       setScene('INSPECT');
-    }, 600); // Realistic network delay
-  };
-
-  const handleForwardClick = () => {
-    setScene('PREDICT');
+    }, 1200);
   };
 
   const handlePrediction = async (prediction) => {
-    await fetch("/api/jwt-alg-none", {
+    setIsForwarding(true);
+    setForwardingText('Forwarding Request...');
+    
+    await apiFetch("/api/jwt-alg-none", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: 'MAKE_PREDICTION', payload: { prediction } })
     });
     
-    // Process the forward
-    const res = await fetch("/api/jwt-alg-none", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        type: 'FORWARD_REQUEST', 
-        payload: { header: jwtHeader, signature: jwtSignature } 
-      })
-    });
-    const data = await res.json();
-    await fetchState();
+    setScene('FORWARDING_UI');
+    
+    setTimeout(() => setForwardingText('Reading Header...'), 600);
+    setTimeout(() => setForwardingText('Verifying Token...'), 1200);
 
     setTimeout(async () => {
+      const res = await apiFetch("/api/jwt-alg-none", {
+        method: "POST",
+        body: JSON.stringify({ type: 'FORWARD_REQUEST', payload: { header: jwtHeader, signature: jwtSignature } })
+      });
+      const data = await res.json();
+      await fetchState(false);
+      
+      setIsForwarding(false);
+
       if (data.success) {
-        // Verification Skipped! Let's advance to Admin Access
-        await fetch("/api/jwt-alg-none", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: 'GRANT_ADMIN' })
-        });
-        await fetchState();
         setScene('DASHBOARD');
       } else {
-        showToast(data.message || "Request Rejected by Server.", "error");
-        setScene('INSPECT'); // Send them back to try again
+        showToast(data.message, "error");
+        setScene('INSPECT'); 
       }
-    }, 800);
+    }, 1800);
   };
 
-  const startExplanation = async () => {
-    setScene('EXPLAIN');
-    await fetch("/api/jwt-alg-none", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: 'BEGIN_EXPLANATION' })
-    });
-    await fetchState();
-  };
+  // Automated Replay Engine
+  const handleReplay = async () => {
+    setShowFlagModal(false);
+    setIsReplaying(true);
+    await resetLab(true); // Silent reset
 
-  const runVerification = async () => {
-    setIsVerifying(true);
-    try {
-      const res = await fetch("/api/jwt-alg-none?action=verify");
-      const data = await res.json();
-      if (data.complete && selectedAnswer === "server_trusted_client") {
-        setFlag(data.flag);
-        setShowFlagModal(true);
-      } else {
-        showToast("Verification failed. Review the mental model.", "error");
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsVerifying(false);
-    }
+    // Automated Sequence
+    setTimeout(() => handleLogin(), 500);
+    setTimeout(() => setJwtHeader('{\n  "alg": "none",\n  "typ": "JWT"\n}'), 3000);
+    setTimeout(() => setJwtSignature(''), 4500);
+    setTimeout(() => setScene('PREDICT'), 5500);
+    setTimeout(() => handlePrediction('Accept'), 6500);
+    
+    setTimeout(() => setIsReplaying(false), 10000); // End replay lock
   };
 
   const currentStep = labState?.timelineStep || 1;
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#09090b] font-sans text-gray-200 pb-10 overflow-hidden relative selection:bg-blue-500/30">
+    <div className="flex flex-col min-h-screen bg-[#09090b] font-sans text-gray-200 pb-10 overflow-hidden relative selection:bg-blue-500/30 outline-none" tabIndex={0}>
       
       {/* PREMIUM TOAST */}
       {toast && (
@@ -195,7 +220,14 @@ export default function JwtAlgNone() {
       {isResetting && (
         <div className="fixed inset-0 bg-[#09090b] z-50 flex flex-col items-center justify-center animate-fade-in">
           <div className="w-8 h-8 border-4 border-gray-800 border-t-white rounded-full animate-spin mb-4"></div>
-          <h2 className="text-white text-lg font-bold tracking-widest uppercase">Resetting Lab...</h2>
+          <h2 className="text-white text-lg font-bold tracking-widest uppercase">Resetting Session...</h2>
+        </div>
+      )}
+
+      {/* REPLAY OVERLAY BADGE */}
+      {isReplaying && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-blue-600 text-white text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg animate-pulse">
+          Replay in Progress
         </div>
       )}
 
@@ -206,7 +238,7 @@ export default function JwtAlgNone() {
             <h1 className="text-2xl font-black text-white tracking-tight">Hunter Labs</h1>
             <p className="text-xs font-bold text-blue-400 uppercase tracking-widest mt-0.5">Day 15: Algorithm Confusion</p>
           </div>
-          <button onClick={resetLab} className="bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm font-bold px-4 py-2 rounded-lg transition">
+          <button onClick={() => resetLab(false)} disabled={isAuthenticating || isForwarding || isReplaying} className="bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm font-bold px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
             Reset Lab
           </button>
         </div>
@@ -229,19 +261,20 @@ export default function JwtAlgNone() {
               <form onSubmit={handleLogin} className="space-y-5">
                 <div>
                   <label className="block text-sm font-bold text-gray-400 mb-2">Email Address</label>
-                  <input type="email" disabled value="hunter@lab.local" className="w-full border border-gray-800 rounded-lg px-4 py-3 bg-[#09090b] text-gray-400 cursor-not-allowed shadow-inner" />
+                  <input type="email" disabled value="hunter@lab.local" className="w-full border border-gray-800 rounded-lg px-4 py-3 bg-[#09090b] text-gray-400 cursor-not-allowed shadow-inner focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-400 mb-2">Password</label>
-                  <input type="password" disabled value="Password123" className="w-full border border-gray-800 rounded-lg px-4 py-3 bg-[#09090b] text-gray-400 cursor-not-allowed shadow-inner font-mono tracking-widest" />
+                  <input type="password" disabled value="Password123" className="w-full border border-gray-800 rounded-lg px-4 py-3 bg-[#09090b] text-gray-400 cursor-not-allowed shadow-inner font-mono tracking-widest focus:outline-none" />
                 </div>
                 
                 <button 
                   type="submit" 
-                  disabled={isAuthenticating}
-                  className="w-full bg-white hover:bg-gray-200 disabled:opacity-80 text-black font-bold py-3.5 rounded-lg transition shadow-[0_0_20px_rgba(255,255,255,0.1)] flex justify-center items-center gap-2 mt-4"
+                  disabled={isAuthenticating || isReplaying}
+                  className="w-full bg-white hover:bg-gray-200 disabled:opacity-80 text-black font-bold py-3.5 rounded-lg transition shadow-[0_0_20px_rgba(255,255,255,0.1)] flex justify-center items-center gap-2 mt-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-[#111113]"
                 >
-                  {isAuthenticating ? <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div> : 'Login to Workspace'}
+                  {isAuthenticating ? <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div> : null}
+                  {loginText}
                 </button>
               </form>
             </div>
@@ -254,47 +287,56 @@ export default function JwtAlgNone() {
                 <span className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-500"></span> Request Interceptor
                 </span>
-                <span className="text-xs font-mono bg-blue-900/30 text-blue-400 px-2 py-1 rounded border border-blue-500/30">HTTP/1.1 200 OK</span>
+                <span className="text-xs font-mono bg-blue-900/30 text-blue-400 px-3 py-1 rounded border border-blue-500/30 font-bold shadow-sm">Response intercepted — 200 OK</span>
               </div>
               
               <div className="p-6 font-mono text-sm leading-relaxed overflow-x-auto bg-[#09090b] text-gray-300 flex-1 space-y-6">
                 
                 {/* Simulated Response Context */}
                 <div className="text-gray-500 mb-4 pb-4 border-b border-gray-800 select-none">
-                  Set-Cookie: session_id=8f92j...<br/>
+                  Set-Cookie: session_id={sessionId.substring(0,6)}...<br/>
                   Authorization: Bearer <span className="text-gray-300">eyJhbG...</span>
                 </div>
 
-                {/* JWT Header Editor */}
-                <div className="relative group">
-                  <div className="absolute -top-3 left-4 bg-[#111113] text-red-400 text-[10px] px-2 py-0.5 font-bold tracking-widest z-10 border border-gray-800 rounded">HEADER</div>
+                {/* JWT Header Editor (RED) */}
+                <div className="relative group mt-2">
+                  <div className="absolute -top-3 left-4 bg-[#111113] text-red-400 text-[10px] px-2 py-0.5 font-bold tracking-widest z-10 border border-gray-800 rounded flex items-center gap-1">
+                    <span aria-hidden="true">★</span> HEADER
+                  </div>
                   <textarea 
                     value={jwtHeader}
                     onChange={(e) => setJwtHeader(e.target.value)}
-                    className="w-full h-24 bg-[#18181b] text-red-300 border border-gray-800 focus:border-red-500/50 rounded-lg p-4 pt-5 focus:outline-none resize-none font-mono"
+                    disabled={isReplaying}
+                    className="w-full h-24 bg-[#18181b] text-red-300 border border-red-900/50 focus:border-red-500/50 rounded-lg p-4 pt-5 focus:outline-none resize-none font-mono transition-colors shadow-inner"
                     spellCheck="false"
                   />
                 </div>
 
-                {/* JWT Payload Editor (Boring by design) */}
-                <div className="relative group">
-                  <div className="absolute -top-3 left-4 bg-[#111113] text-purple-400 text-[10px] px-2 py-0.5 font-bold tracking-widest z-10 border border-gray-800 rounded">PAYLOAD</div>
+                {/* JWT Payload Editor (GREY / READONLY) */}
+                <div className="relative group" title="Payload isn't today's lesson.">
+                  <div className="absolute -top-3 left-4 bg-[#111113] text-gray-500 text-[10px] px-2 py-0.5 font-bold tracking-widest z-10 border border-gray-800 rounded flex items-center gap-1">
+                    <span aria-hidden="true">🔒</span> PAYLOAD (Locked)
+                  </div>
                   <textarea 
+                    readOnly
                     value={jwtPayload}
-                    onChange={(e) => setJwtPayload(e.target.value)}
-                    className="w-full h-36 bg-[#18181b] text-purple-300 border border-gray-800 focus:border-purple-500/50 rounded-lg p-4 pt-5 focus:outline-none resize-none font-mono"
+                    className="w-full h-36 bg-[#18181b]/40 text-gray-500 border border-gray-800/50 rounded-lg p-4 pt-5 focus:outline-none resize-none font-mono cursor-not-allowed"
                     spellCheck="false"
+                    tabIndex={-1}
                   />
                 </div>
 
-                {/* JWT Signature Editor */}
+                {/* JWT Signature Editor (BLUE) */}
                 <div className="relative group">
-                  <div className="absolute -top-3 left-4 bg-[#111113] text-blue-400 text-[10px] px-2 py-0.5 font-bold tracking-widest z-10 border border-gray-800 rounded">SIGNATURE</div>
+                  <div className="absolute -top-3 left-4 bg-[#111113] text-blue-400 text-[10px] px-2 py-0.5 font-bold tracking-widest z-10 border border-gray-800 rounded flex items-center gap-1">
+                    <span aria-hidden="true">✍</span> SIGNATURE
+                  </div>
                   <input 
                     type="text"
                     value={jwtSignature}
                     onChange={(e) => setJwtSignature(e.target.value)}
-                    className="w-full bg-[#18181b] text-blue-300 border border-gray-800 focus:border-blue-500/50 rounded-lg p-4 focus:outline-none font-mono"
+                    disabled={isReplaying}
+                    className="w-full bg-[#18181b] text-blue-300 border border-blue-900/50 focus:border-blue-500/50 rounded-lg p-4 focus:outline-none font-mono transition-colors shadow-inner"
                     spellCheck="false"
                   />
                 </div>
@@ -303,8 +345,9 @@ export default function JwtAlgNone() {
 
               <div className="bg-[#111113] p-5 border-t border-gray-800 flex justify-end">
                 <button 
-                  onClick={handleForwardClick}
-                  className="bg-white hover:bg-gray-200 text-black font-black px-8 py-2.5 rounded-lg transition shadow-[0_0_15px_rgba(255,255,255,0.2)] text-sm"
+                  onClick={() => setScene('PREDICT')}
+                  disabled={isForwarding || isReplaying}
+                  className="bg-white hover:bg-gray-200 disabled:opacity-50 text-black font-black px-8 py-2.5 rounded-lg transition shadow-[0_0_15px_rgba(255,255,255,0.2)] text-sm disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-[#111113]"
                 >
                   Forward Request ➔
                 </button>
@@ -322,17 +365,27 @@ export default function JwtAlgNone() {
               <div className="flex gap-6 w-full max-w-sm">
                 <button 
                   onClick={() => handlePrediction('Reject')}
-                  className="flex-1 bg-transparent border-2 border-red-500/50 hover:bg-red-500/10 text-red-400 font-bold py-4 rounded-xl transition"
+                  disabled={isForwarding || isReplaying}
+                  className="flex-1 bg-transparent border-2 border-red-500/50 hover:bg-red-500/10 text-red-400 font-bold py-4 rounded-xl transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
                 >
                   Reject
                 </button>
                 <button 
                   onClick={() => handlePrediction('Accept')}
-                  className="flex-1 bg-transparent border-2 border-green-500/50 hover:bg-green-500/10 text-green-400 font-bold py-4 rounded-xl transition"
+                  disabled={isForwarding || isReplaying}
+                  className="flex-1 bg-transparent border-2 border-green-500/50 hover:bg-green-500/10 text-green-400 font-bold py-4 rounded-xl transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   Accept
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* SCENE 3.5: FORWARDING DYNAMIC HEARTBEAT SUSPENSE */}
+          {scene === 'FORWARDING_UI' && (
+            <div className="absolute inset-0 bg-[#09090b]/95 backdrop-blur-md rounded-2xl z-20 flex flex-col items-center justify-center p-8 animate-fade-in border border-gray-800 shadow-2xl">
+              <div className="w-12 h-12 border-4 border-gray-800 border-t-blue-500 rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(59,130,246,0.3)]"></div>
+              <h1 className="text-xl font-bold text-white tracking-widest uppercase animate-pulse">{forwardingText}</h1>
             </div>
           )}
 
@@ -356,30 +409,37 @@ export default function JwtAlgNone() {
                 <h2 className="text-3xl font-black text-white mb-2">Access Granted</h2>
                 <p className="text-gray-400 mb-12">Welcome to the administration panel.</p>
                 
-                <button onClick={startExplanation} className="bg-white hover:bg-gray-200 text-black font-bold py-3 px-8 rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.15)] flex items-center gap-2 transition">
-                  Why did this work? ➔
-                </button>
+                {!isReplaying && (
+                  <button 
+                    onClick={async () => {
+                      setScene('EXPLAIN');
+                      await apiFetch("/api/jwt-alg-none", { method: "POST", body: JSON.stringify({ type: 'BEGIN_EXPLANATION' }) });
+                      await fetchState(false);
+                    }} 
+                    className="bg-white hover:bg-gray-200 text-black font-bold py-3 px-8 rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.15)] flex items-center gap-2 transition focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#111113]"
+                  >
+                    Why did this work? ➔
+                  </button>
+                )}
               </div>
             </div>
           )}
 
           {/* SCENE 5: EXPLANATION SLIDES */}
           {(scene === 'EXPLAIN' || scene === 'VERIFY' || scene === 'COMPLETE') && (
-            <div className="bg-[#111113] rounded-2xl shadow-2xl border border-gray-800 p-10 flex flex-col justify-center animate-fade-in min-h-[500px]">
+            <div className="bg-[#111113] rounded-2xl shadow-2xl border border-gray-800 p-6 md:p-10 flex flex-col justify-center animate-fade-in min-h-[500px]">
               
-              {/* Controls */}
               <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
                 <span className="text-gray-500 font-bold text-xs uppercase tracking-widest">Logic Breakdown</span>
                 <div className="flex gap-2">
-                  <button onClick={() => setExplainStep(Math.max(0, explainStep - 1))} disabled={explainStep === 0} className="text-gray-500 hover:text-white disabled:opacity-30">◀</button>
+                  <button onClick={() => setExplainStep(Math.max(0, explainStep - 1))} disabled={explainStep === 0} className="text-gray-500 hover:text-white disabled:opacity-30 focus:outline-none">◀</button>
                   <span className="text-gray-400 text-sm font-mono"><span className="text-blue-400 font-bold">{explainStep + 1}</span> / 5</span>
-                  <button onClick={() => setExplainStep(Math.min(4, explainStep + 1))} disabled={explainStep === 4} className="text-gray-500 hover:text-white disabled:opacity-30">▶</button>
+                  <button onClick={() => setExplainStep(Math.min(4, explainStep + 1))} disabled={explainStep === 4} className="text-gray-500 hover:text-white disabled:opacity-30 focus:outline-none">▶</button>
                 </div>
               </div>
 
               <div className="flex-1 flex flex-col justify-center text-center px-4">
                 
-                {/* SLIDE 1: Character Dialogue */}
                 {explainStep === 0 && (
                   <div className="space-y-6 max-w-sm mx-auto w-full">
                     {dialogueStep >= 1 && (
@@ -401,7 +461,7 @@ export default function JwtAlgNone() {
                     {dialogueStep >= 3 && (
                       <div className="animate-fade-in-up flex items-start gap-3 justify-end">
                         <div className="bg-blue-900/40 border border-blue-500/30 text-blue-100 p-3 rounded-2xl rounded-tr-sm text-sm text-right">
-                          Theek hai. (Verification Skipped)
+                          Theek hai... Skip kar deta hoon.
                         </div>
                         <div className="text-2xl mt-1">🤖</div>
                       </div>
@@ -409,57 +469,57 @@ export default function JwtAlgNone() {
                   </div>
                 )}
 
-                {/* SLIDE 2: Concept Core */}
                 {explainStep === 1 && (
+                  <div className="animate-fade-in flex flex-col items-center w-full max-w-md mx-auto space-y-4">
+                    <h3 className="text-gray-400 text-sm font-bold uppercase tracking-widest mb-4">The Mistake</h3>
+                    {flowAnim >= 1 && <div className="bg-gray-800 px-6 py-2 rounded shadow-lg text-sm animate-fade-in-up w-full">Client</div>}
+                    {flowAnim >= 2 && <div className="text-gray-500 text-xl animate-fade-in-up">↓</div>}
+                    {flowAnim >= 3 && <div className="bg-gray-800 px-6 py-2 rounded shadow-lg text-sm animate-fade-in-up w-full">JWT</div>}
+                    {flowAnim >= 4 && <div className="text-gray-500 text-xl animate-fade-in-up">↓</div>}
+                    {flowAnim >= 5 && <div className="bg-blue-900/30 text-blue-400 font-bold border border-blue-500/50 px-6 py-2 rounded shadow-lg text-sm animate-fade-in-up w-full">Server Reads Header: <span className="font-mono text-red-400">alg:none</span></div>}
+                    {flowAnim >= 6 && <div className="text-gray-500 text-xl animate-fade-in-up">↓</div>}
+                    {flowAnim >= 7 && <div className="bg-green-900/30 text-green-400 font-bold border border-green-500/50 px-6 py-2 rounded shadow-lg text-sm animate-fade-in-up w-full">Verification Skipped ➔ Admin</div>}
+                  </div>
+                )}
+
+                {explainStep === 2 && (
                   <div className="animate-fade-in space-y-8">
-                    <p className="text-2xl text-gray-300 leading-relaxed font-light">
+                    <p className="text-2xl md:text-3xl text-gray-300 leading-relaxed font-light">
                       Server should <strong className="text-white">already know</strong><br/>
                       how to verify a token.
                     </p>
-                    <p className="text-2xl text-gray-300 leading-relaxed font-light">
+                    <p className="text-2xl md:text-3xl text-gray-300 leading-relaxed font-light">
                       It should <strong className="text-red-400">never ask</strong><br/>
                       the client.
                     </p>
                   </div>
                 )}
 
-                {/* SLIDE 3: Mental Model Flow */}
-                {explainStep === 2 && (
-                  <div className="animate-fade-in space-y-8">
-                    <h3 className="text-gray-400 text-sm font-bold uppercase tracking-widest mb-6">The Mistake</h3>
-                    <div className="flex flex-col items-center gap-4 text-sm font-mono text-gray-300 max-w-xs mx-auto">
-                      <div className="bg-gray-800 border border-gray-700 px-6 py-3 rounded-lg w-full">Client controls verification</div>
-                      <span className="text-gray-600">↓</span>
-                      <div className="bg-gray-800 border border-gray-700 px-6 py-3 rounded-lg w-full">Server obeys</div>
-                      <span className="text-gray-600">↓</span>
-                      <div className="bg-red-900/30 border border-red-500/30 text-red-400 font-bold px-6 py-3 rounded-lg w-full">Verification Skipped</div>
-                    </div>
-                  </div>
-                )}
-
-                {/* SLIDE 4: Good vs Bad Architecture */}
                 {explainStep === 3 && (
-                  <div className="animate-fade-in grid grid-cols-2 gap-6 text-left">
-                    <div className="bg-red-950/20 border border-red-900/30 rounded-xl overflow-hidden">
+                  <div className="animate-fade-in flex flex-col md:flex-row gap-6 text-left items-stretch">
+                    <div className="bg-red-950/20 border border-red-900/30 rounded-xl overflow-hidden flex-1">
                       <div className="bg-red-900/30 px-4 py-2 text-red-400 font-bold text-xs uppercase tracking-widest text-center border-b border-red-900/30">Bad Architecture</div>
-                      <div className="p-6 font-mono text-sm text-gray-300 space-y-3">
+                      <div className="p-6 font-mono text-sm space-y-3">
                         <p className="text-gray-500">// Reads header dynamically</p>
-                        <p>const alg = token.header.alg;</p>
-                        <p className="text-red-400 font-bold mt-2">verify(token, secret, alg);</p>
+                        <p className="text-gray-300">const alg = token.header.alg;</p>
+                        <p className="mt-2 text-gray-500">
+                          verify(token, secret, <span className="text-red-400 font-bold">alg</span>);
+                        </p>
                       </div>
                     </div>
-                    <div className="bg-green-950/20 border border-green-900/30 rounded-xl overflow-hidden">
+                    <div className="bg-green-950/20 border border-green-900/30 rounded-xl overflow-hidden flex-1">
                       <div className="bg-green-900/30 px-4 py-2 text-green-400 font-bold text-xs uppercase tracking-widest text-center border-b border-green-900/30">Good Architecture</div>
-                      <div className="p-6 font-mono text-sm text-gray-300 space-y-3">
+                      <div className="p-6 font-mono text-sm space-y-3">
                         <p className="text-gray-500">// Hardcoded by server</p>
-                        <p>const alg = "HS256";</p>
-                        <p className="text-green-400 font-bold mt-2">verify(token, secret, alg);</p>
+                        <p className="text-gray-300">const alg = "HS256";</p>
+                        <p className="mt-2 text-gray-500">
+                          verify(token, secret, <span className="text-green-400 font-bold">"HS256"</span>);
+                        </p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* SLIDE 5: Hacker Memory */}
                 {explainStep === 4 && (
                   <div className="animate-fade-in flex flex-col gap-6 items-center w-full max-w-sm mx-auto">
                     <div className="w-full bg-[#18181b] border border-gray-800 rounded-xl p-8 text-center shadow-lg">
@@ -469,7 +529,7 @@ export default function JwtAlgNone() {
                     
                     <button 
                       onClick={() => setScene('VERIFY')} 
-                      className="mt-4 w-full bg-white text-black font-black py-3.5 rounded-lg hover:bg-gray-200 transition shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                      className="mt-4 w-full bg-white text-black font-black py-3.5 rounded-lg hover:bg-gray-200 transition shadow-[0_0_20px_rgba(255,255,255,0.1)] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#111113]"
                     >
                       Solve Lab
                     </button>
@@ -484,7 +544,7 @@ export default function JwtAlgNone() {
         {/* RIGHT PANE: Learning Journey Timeline & Hacker Console */}
         <div className="lg:col-span-5 flex flex-col gap-6 relative z-40">
           
-          {/* LEARNING JOURNEY TIMELINE (Backend-driven) */}
+          {/* LEARNING JOURNEY TIMELINE */}
           <div className="bg-[#111113] rounded-xl shadow-xl border border-gray-800 overflow-hidden flex flex-col flex-1">
             <div className="bg-[#18181b] px-5 py-4 border-b border-gray-800">
               <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Learning Journey</span>
@@ -492,86 +552,26 @@ export default function JwtAlgNone() {
             <div className="p-6 bg-[#09090b] flex-1">
               <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-gray-800 before:via-gray-800 before:to-transparent">
                 
-                {/* Step 1: Login */}
-                <div className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group transition-all duration-300 ${currentStep >= 1 ? 'opacity-100' : 'opacity-30 grayscale'}`}>
-                  <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 bg-[#09090b] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm ${currentStep >= 1 ? 'border-gray-500 text-gray-400' : 'border-gray-800'}`}>
-                    {currentStep >= 1 && <span aria-hidden="true" className="text-[10px]">✔</span>}
+                {/* Steps 1-8 driven by Timeline state */}
+                {[
+                  { id: 1, label: 'Login', color: 'gray' },
+                  { id: 2, label: 'JWT Issued', color: 'gray' },
+                  { id: 3, label: 'Header Modified', color: 'red' },
+                  { id: 4, label: 'Signature Removed', color: 'blue' },
+                  { id: 5, label: 'Prediction Recorded', color: 'purple' },
+                  { id: 6, label: 'Request Sent', color: 'gray' },
+                  { id: 7, label: 'Verification Skipped', color: 'yellow', icon: '!' },
+                  { id: 8, label: 'Admin Access', color: 'green', icon: '🔓' }
+                ].map(step => (
+                  <div key={step.id} className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group transition-all duration-300 ${currentStep >= step.id ? 'opacity-100' : 'opacity-30 grayscale'}`}>
+                    <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 bg-[#09090b] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm ${currentStep >= step.id ? `border-${step.color}-500 ${step.color !== 'gray' ? `bg-${step.color}-900/20 text-${step.color}-400` : 'text-gray-400'}` : 'border-gray-800'}`}>
+                      {currentStep >= step.id && <span aria-hidden="true" className={step.icon ? 'text-[10px] font-black' : 'text-[10px]'}>{step.icon || '✔'}</span>}
+                    </div>
+                    <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] bg-[#18181b] p-2.5 rounded-lg border border-gray-800 text-sm">
+                      <p className={`font-bold ${currentStep >= step.id && step.color !== 'gray' ? `text-${step.color}-400` : 'text-gray-300'} ${step.id >= 7 ? 'tracking-wide' : ''}`}>{step.label}</p>
+                    </div>
                   </div>
-                  <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] bg-[#18181b] p-2.5 rounded-lg border border-gray-800 text-sm">
-                    <p className="font-bold text-gray-300">Login</p>
-                  </div>
-                </div>
-
-                {/* Step 2: JWT Issued */}
-                <div className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group transition-all duration-300 ${currentStep >= 2 ? 'opacity-100' : 'opacity-30 grayscale'}`}>
-                  <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 bg-[#09090b] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm ${currentStep >= 2 ? 'border-gray-500 text-gray-400' : 'border-gray-800'}`}>
-                     {currentStep >= 2 && <span aria-hidden="true" className="text-[10px]">✔</span>}
-                  </div>
-                  <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] bg-[#18181b] p-2.5 rounded-lg border border-gray-800 text-sm">
-                    <p className="font-bold text-gray-300">JWT Issued</p>
-                  </div>
-                </div>
-
-                {/* Step 3: Header Modified */}
-                <div className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group transition-all duration-300 ${currentStep >= 3 ? 'opacity-100' : 'opacity-30 grayscale'}`}>
-                  <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 bg-[#09090b] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm ${currentStep >= 3 ? 'border-red-500 bg-red-900/20 text-red-400' : 'border-gray-800'}`}>
-                     {currentStep >= 3 && <span aria-hidden="true" className="text-[10px]">✔</span>}
-                  </div>
-                  <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] bg-[#18181b] p-2.5 rounded-lg border border-gray-800 text-sm">
-                    <p className="font-bold text-red-300">Header Modified</p>
-                  </div>
-                </div>
-
-                {/* Step 4: Signature Removed */}
-                <div className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group transition-all duration-300 ${currentStep >= 4 ? 'opacity-100' : 'opacity-30 grayscale'}`}>
-                  <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 bg-[#09090b] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm ${currentStep >= 4 ? 'border-blue-500 bg-blue-900/20 text-blue-400' : 'border-gray-800'}`}>
-                    {currentStep >= 4 && <span aria-hidden="true" className="text-[10px]">✔</span>}
-                  </div>
-                  <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] bg-[#18181b] p-2.5 rounded-lg border border-gray-800 text-sm">
-                    <p className="font-bold text-blue-300">Signature Removed</p>
-                  </div>
-                </div>
-
-                {/* Step 5: Prediction */}
-                <div className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group transition-all duration-300 ${currentStep >= 5 ? 'opacity-100' : 'opacity-30 grayscale'}`}>
-                  <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 bg-[#09090b] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm ${currentStep >= 5 ? 'border-purple-500 bg-purple-900/20 text-purple-400' : 'border-gray-800'}`}>
-                    {currentStep >= 5 && <span aria-hidden="true" className="text-[10px]">✔</span>}
-                  </div>
-                  <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] bg-[#18181b] p-2.5 rounded-lg border border-gray-800 text-sm">
-                    <p className="font-bold text-purple-300">Prediction Recorded</p>
-                  </div>
-                </div>
-
-                {/* Step 6: Request Forwarded */}
-                <div className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group transition-all duration-300 ${currentStep >= 6 ? 'opacity-100' : 'opacity-30 grayscale'}`}>
-                  <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 bg-[#09090b] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm ${currentStep >= 6 ? 'border-gray-400 text-gray-300' : 'border-gray-800'}`}>
-                    {currentStep >= 6 && <span aria-hidden="true" className="text-[10px]">✔</span>}
-                  </div>
-                  <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] bg-[#18181b] p-2.5 rounded-lg border border-gray-800 text-sm">
-                    <p className="font-bold text-gray-300">Request Sent</p>
-                  </div>
-                </div>
-
-                {/* Step 7: Verification Skipped */}
-                <div className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group transition-all duration-300 ${currentStep >= 7 ? 'opacity-100 delay-300' : 'opacity-30 grayscale'}`}>
-                  <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 bg-[#09090b] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm ${currentStep >= 7 ? 'border-yellow-500 bg-yellow-900/20 text-yellow-400' : 'border-gray-800'}`}>
-                    {currentStep >= 7 && <span className="text-[10px] font-black" aria-hidden="true">!</span>}
-                  </div>
-                  <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] bg-[#18181b] p-2.5 rounded-lg border border-gray-800 text-sm">
-                    <p className="font-black text-yellow-500 tracking-wide">Verification Skipped</p>
-                  </div>
-                </div>
-
-                {/* Step 8: Admin Access */}
-                <div className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group transition-all duration-300 ${currentStep >= 8 ? 'opacity-100 delay-500' : 'opacity-30 grayscale'}`}>
-                  <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 bg-[#09090b] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm ${currentStep >= 8 ? 'border-green-500 bg-green-900/20 text-green-400' : 'border-gray-800'}`}>
-                    {currentStep >= 8 && <span className="text-[10px] font-black" aria-hidden="true">🔓</span>}
-                  </div>
-                  <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] bg-[#18181b] p-2.5 rounded-lg border border-gray-800 text-sm">
-                    <p className="font-black text-green-400 tracking-wide">Admin Access</p>
-                  </div>
-                </div>
-
+                ))}
               </div>
             </div>
           </div>
@@ -590,31 +590,24 @@ export default function JwtAlgNone() {
               <p className="text-gray-300 text-sm font-medium mb-4">Why did access succeed?</p>
               
               <div className="space-y-3 text-sm">
-                <label className={`flex items-center p-3 rounded-lg border cursor-pointer transition ${selectedAnswer === 'broken_crypto' ? 'bg-[#18181b] border-gray-700' : 'border-gray-800 hover:bg-[#18181b]'}`}>
-                  <input type="radio" name="quiz" value="broken_crypto" onChange={(e) => setSelectedAnswer(e.target.value)} checked={selectedAnswer === 'broken_crypto'} className="mr-3" />
-                  <span className="text-gray-300">JWT encryption was broken.</span>
-                </label>
-                <label className={`flex items-center p-3 rounded-lg border cursor-pointer transition ${selectedAnswer === 'payload_admin' ? 'bg-[#18181b] border-gray-700' : 'border-gray-800 hover:bg-[#18181b]'}`}>
-                  <input type="radio" name="quiz" value="payload_admin" onChange={(e) => setSelectedAnswer(e.target.value)} checked={selectedAnswer === 'payload_admin'} className="mr-3" />
-                  <span className="text-gray-300">The payload became admin.</span>
-                </label>
-                <label className={`flex items-start p-3 rounded-lg border cursor-pointer transition ${selectedAnswer === 'server_trusted_client' ? 'bg-blue-900/20 border-blue-500/50' : 'border-gray-800 hover:bg-[#18181b]'}`}>
-                  <input type="radio" name="quiz" value="server_trusted_client" onChange={(e) => setSelectedAnswer(e.target.value)} checked={selectedAnswer === 'server_trusted_client'} className="mr-3 mt-1" />
-                  <div>
-                    <span className="text-white font-medium block">Server trusted client-controlled verification settings.</span>
-                  </div>
-                </label>
-                <label className={`flex items-center p-3 rounded-lg border cursor-pointer transition ${selectedAnswer === 'no_security' ? 'bg-[#18181b] border-gray-700' : 'border-gray-800 hover:bg-[#18181b]'}`}>
-                  <input type="radio" name="quiz" value="no_security" onChange={(e) => setSelectedAnswer(e.target.value)} checked={selectedAnswer === 'no_security'} className="mr-3" />
-                  <span className="text-gray-300">JWT has no security.</span>
-                </label>
+                {[
+                  { value: 'broken_crypto', label: 'JWT encryption was broken.' },
+                  { value: 'payload_admin', label: 'The payload became admin.' },
+                  { value: 'server_trusted_client', label: 'Server trusted client-controlled verification settings.', correct: true },
+                  { value: 'no_security', label: 'JWT has no security.' }
+                ].map(opt => (
+                  <label key={opt.value} className={`flex items-center p-3 rounded-lg border cursor-pointer transition focus-within:ring-2 focus-within:ring-blue-500 ${selectedAnswer === opt.value ? (opt.correct ? 'bg-blue-900/20 border-blue-500/50' : 'bg-[#18181b] border-gray-700') : 'border-gray-800 hover:bg-[#18181b]'}`}>
+                    <input type="radio" name="quiz" value={opt.value} onChange={(e) => setSelectedAnswer(e.target.value)} checked={selectedAnswer === opt.value} className="mr-3 focus:ring-0" />
+                    <span className={selectedAnswer === opt.value && opt.correct ? "text-white font-medium" : "text-gray-300"}>{opt.label}</span>
+                  </label>
+                ))}
               </div>
             </div>
 
             <button 
               onClick={runVerification} 
               disabled={isVerifying || !selectedAnswer || scene !== 'VERIFY'}
-              className="w-full bg-white hover:bg-gray-200 text-black font-black py-3.5 rounded-lg transition shadow-[0_0_15px_rgba(255,255,255,0.1)] disabled:opacity-50 disabled:cursor-not-allowed mt-auto relative z-10"
+              className="w-full bg-white hover:bg-gray-200 text-black font-black py-3.5 rounded-lg transition shadow-[0_0_15px_rgba(255,255,255,0.1)] disabled:opacity-50 disabled:cursor-not-allowed mt-auto relative z-10 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#111113]"
             >
               {isVerifying ? "Verifying..." : "Claim Flag"}
             </button>
@@ -623,32 +616,50 @@ export default function JwtAlgNone() {
         </div>
       </div>
 
-      {/* 🏆 FINAL FLAG MODAL */}
+      {/* 🏆 GAMIFIED ACHIEVEMENT MODAL (Replaces Basic Flag Modal) */}
       {showFlagModal && (
         <div className="fixed inset-0 bg-[#09090b]/90 flex items-center justify-center z-50 p-4 animate-fade-in backdrop-blur-sm">
           <div className="bg-[#111113] rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-gray-800">
-            <div className="bg-gray-900 p-6 text-center border-b border-gray-800">
+            <div className="bg-gray-900 p-6 text-center border-b border-gray-800 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-green-400"></div>
+              <p className="text-blue-400 text-xs font-bold uppercase tracking-widest mb-1">Day 15 Complete</p>
               <h2 className="text-2xl font-black text-white tracking-wide uppercase">Algorithm Confusion</h2>
             </div>
             
-            <div className="p-8">
+            <div className="p-8 pb-6">
+              
+              <div className="flex justify-between items-center bg-[#18181b] border border-gray-800 rounded-xl p-4 mb-6">
+                <div>
+                  <p className="text-gray-400 text-xs uppercase font-bold tracking-wider mb-1">Reward</p>
+                  <p className="text-green-400 font-black text-xl">+15 XP</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-gray-400 text-xs uppercase font-bold tracking-wider mb-1">Rank</p>
+                  <p className="text-white font-bold">JWT Apprentice</p>
+                </div>
+              </div>
+
               <div className="text-center mb-6">
-                <div className="bg-[#09090b] p-4 rounded-lg border border-gray-800 font-mono text-green-400 font-black text-lg select-all shadow-inner">
+                <p className="text-gray-500 text-xs uppercase font-bold tracking-wider mb-2">Captured Flag</p>
+                <div className="bg-[#09090b] p-3 rounded-lg border border-gray-800 font-mono text-gray-300 font-bold text-sm select-all shadow-inner">
                   {flag}
                 </div>
               </div>
 
-              <div className="bg-blue-900/10 border border-blue-900/30 rounded-xl p-6 mb-8 text-center shadow-lg">
-                <p className="text-white font-bold text-lg leading-tight mb-2">Server trusted the client's security decision.</p>
+              <div className="bg-blue-900/10 border border-blue-900/30 rounded-xl p-5 mb-8 text-center shadow-lg">
+                <p className="text-white font-bold text-md leading-tight mb-2">Server trusted the client's security decision.</p>
                 <p className="text-blue-400 text-xs font-bold uppercase tracking-widest">Never let users choose security logic.</p>
               </div>
 
-              <a href="https://forms.gle/placeholder" target="_blank" rel="noreferrer" className="block w-full bg-white text-black text-center font-bold py-3.5 rounded-lg hover:bg-gray-200 transition shadow-lg">
-                Submit Flag
-              </a>
-              <button onClick={() => setShowFlagModal(false)} className="block w-full text-center text-gray-500 font-bold py-3 mt-3 hover:text-gray-300 transition">
-                Return to Lab
-              </button>
+              <div className="flex gap-4">
+                <button onClick={handleReplay} className="flex-1 bg-[#18181b] hover:bg-gray-800 text-white text-center font-bold py-3.5 rounded-lg border border-gray-700 transition focus:outline-none focus:ring-2 focus:ring-gray-500">
+                  Replay Exploit
+                </button>
+                <a href="/InformationDisclosure" className="flex-1 bg-white text-black text-center font-bold py-3.5 rounded-lg hover:bg-gray-200 transition shadow-lg flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-white">
+                  Next Lab <span aria-hidden="true">➔</span>
+                </a>
+              </div>
+              
             </div>
           </div>
         </div>
