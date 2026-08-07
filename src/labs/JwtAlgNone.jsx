@@ -201,7 +201,23 @@ export default function JwtAlgNone() {
     
     setTimeout(() => setIsReplaying(false), 10000); // End replay lock
   };
-
+  const runVerification = async () => {
+    setIsVerifying(true);
+    try {
+      const res = await apiFetch("/api/jwt-alg-none?action=verify");
+      const data = await res.json();
+      if (data.complete && selectedAnswer === "server_trusted_client") {
+        setFlag(data.flag);
+        setShowFlagModal(true);
+      } else {
+        showToast("Verification failed. Review the mental model.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
   const currentStep = labState?.timelineStep || 1;
   if (!labState && scene !== 'LOGIN') {
     return (
