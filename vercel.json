@@ -1,7 +1,7 @@
 {
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
-    
+    { "source": "/((?!api/).*)", "destination": "/index.html" },
     { "source": "/PriceManipulation", "destination": "/index.html" },
     { "source": "/OtpBypass", "destination": "/index.html" },
     { "source": "/IdorOrder", "destination": "/index.html" },

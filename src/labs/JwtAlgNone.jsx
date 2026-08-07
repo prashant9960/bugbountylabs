@@ -203,6 +203,14 @@ export default function JwtAlgNone() {
   };
 
   const currentStep = labState?.timelineStep || 1;
+  if (!labState && scene !== 'LOGIN') {
+    return (
+      <div className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center text-white">
+        <div className="w-8 h-8 border-4 border-gray-800 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-400 text-sm font-mono">Loading Session...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-[#09090b] font-sans text-gray-200 pb-10 overflow-hidden relative selection:bg-blue-500/30 outline-none" tabIndex={0}>
