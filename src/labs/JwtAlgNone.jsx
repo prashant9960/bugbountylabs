@@ -41,7 +41,7 @@ export default function JwtAlgNone() {
   const [selectedAnswer, setSelectedAnswer] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [showFlagModal, setShowFlagModal] = useState(false);
-
+  const [flag, setFlag] = useState(""); 
   // Initialize Session
   useEffect(() => {
     let id = localStorage.getItem('hunter_session_jwt');
