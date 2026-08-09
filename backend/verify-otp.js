@@ -1,40 +1,51 @@
-// backend/v1/verify-otp.js
+// backend/verify-otp.js
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  try {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
 
-  await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 400));
 
-  const { email, otp } = req.body;
+    // SAFE BODY PARSING: Prevents crashes if Vercel rewrites drop the auto-parser
+    let body = req.body || {};
+    if (typeof req.body === 'string') {
+      try { body = JSON.parse(req.body); } catch (e) {}
+    }
 
-  if (!email || email !== "admin@vcorp.local") {
+    const { email, otp } = body;
+
+    if (!email || email !== "admin@vcorp.local") {
+      return res.status(403).json({
+        success: false,
+        verified: false,
+        message: "Account not found or access restricted."
+      });
+    }
+
+    // Stateless 2-minute attempt context to track the flow
+    const attemptContext = Buffer.from(`${email}:${Date.now()}`).toString('base64');
+
+    if (otp === "827394") {
+      return res.status(200).json({
+        success: true,
+        verified: true,
+        session: attemptContext,
+        message: "Login successful."
+      });
+    }
+
     return res.status(403).json({
       success: false,
       verified: false,
-      message: "Account not found or access restricted."
+      session: attemptContext, 
+      message: "Invalid OTP. Authentication failed."
     });
+
+  } catch (error) {
+    // If anything fails, return JSON instead of a 500 crash page
+    console.error("Verify-OTP Crash:", error);
+    return res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
-
-  // LAB FLOW IDENTIFIER (Not a secure auth token)
-  // This is a stateless 2-minute context used to bridge the UI transition.
-  const labFlowContext = Buffer.from(`${email}:${Date.now()}`).toString('base64');
-
-  // Hardcoded sandbox OTP
-  if (otp === "827394") {
-    return res.status(200).json({
-      success: true,
-      verified: true,
-      session: labFlowContext,
-      message: "Login successful."
-    });
-  }
-
-  return res.status(403).json({
-    success: false,
-    verified: false,
-    session: labFlowContext, 
-    message: "Invalid OTP. Authentication failed."
-  });
 }
