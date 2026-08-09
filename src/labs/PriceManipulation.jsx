@@ -237,7 +237,8 @@ export default function PriceManipulation() {
                 </button>
               </form>
             ) : (
-              <div className="space-y-6 relative overflow-hidden">
+              <div className="flex flex-col space-y-4 relative min-h-[600px] sm:min-h-[500px]">
+                
                 {/* 1. Base Receipt */}
                 <div className={`transition-all duration-700 ${receiptSequence >= 1 && receipt.solvedData ? 'opacity-10 blur-[2px] scale-[0.98]' : 'opacity-100 scale-100'}`}>
                   <div className="text-center border-b pb-6">
@@ -275,87 +276,98 @@ export default function PriceManipulation() {
 
                 {/* 2. Wait... */}
                 {receiptSequence === 1 && receipt.solvedData && (
-                  <div className="absolute inset-0 flex items-center justify-center z-10 animate-fade-in">
-                    <h2 className="text-4xl font-black text-gray-900 tracking-widest uppercase bg-white/80 backdrop-blur-md px-8 py-4 rounded-2xl shadow-xl">Wait...</h2>
+                  <div className="absolute inset-x-0 top-0 bottom-16 flex items-center justify-center z-10 animate-fade-in bg-white/50 backdrop-blur-sm rounded-xl">
+                    <h2 className="text-4xl font-black text-gray-900 tracking-widest uppercase bg-white/90 backdrop-blur-md px-8 py-4 rounded-2xl shadow-xl">Wait...</h2>
                   </div>
                 )}
 
-                {/* 3. Evidence Panel */}
+                {/* 3. Evidence Panel (Scrollable on mobile to prevent missing buttons) */}
                 {receiptSequence >= 2 && receipt.solvedData && (
-                  <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-20 flex flex-col items-center justify-center p-6 animate-fade-in-up">
-                    <p className="text-red-500 font-black tracking-widest uppercase mb-2 text-sm">Suspicious Activity</p>
-                    
-                    <div className="w-full max-w-sm bg-gray-900 text-gray-300 rounded-xl p-6 font-mono text-sm shadow-2xl border border-gray-800 text-left mb-6">
-                      <p className="text-white border-b border-gray-700 pb-2 mb-4 font-bold uppercase">{receipt.solvedData.evidence.title}</p>
+                  <div className="absolute inset-x-0 top-0 bottom-16 bg-white/95 backdrop-blur-md z-20 overflow-y-auto animate-fade-in-up rounded-xl">
+                    <div className="min-h-full flex flex-col items-center justify-start sm:justify-center p-4">
                       
-                      {receipt.solvedData.evidence.product && <p>Product: <span className="text-gray-400">{receipt.solvedData.evidence.product}</span></p>}
-                      {receipt.solvedData.evidence.before && <p>Expected: <span className="text-gray-500 line-through">{receipt.solvedData.evidence.before}</span></p>}
-                      {receipt.solvedData.evidence.after !== undefined && <p>Processed: <span className="text-red-400 font-bold">{receipt.solvedData.evidence.after}</span></p>}
-                      {receipt.solvedData.evidence.impact && <p className="mt-2 text-xs border-t border-gray-800 pt-2 text-gray-400">{receipt.solvedData.evidence.impact}</p>}
-                      
-                      {receipt.solvedData.evidence.requested !== undefined && <p>Requested: <span className="text-red-400 font-bold">{receipt.solvedData.evidence.requested}</span></p>}
-                      {receipt.solvedData.evidence.available !== undefined && <p>Available: <span className="text-gray-400">{receipt.solvedData.evidence.available}</span></p>}
-                      
-                      {receipt.solvedData.evidence.currency && <p>Currency: <span className="text-gray-400">{receipt.solvedData.evidence.currency}</span></p>}
-                      {receipt.solvedData.evidence.expected !== undefined && <p>Expected Rate: <span className="text-gray-400">{receipt.solvedData.evidence.expected}</span></p>}
-                      {receipt.solvedData.evidence.applied && <p>Applied Rate: <span className="text-red-400 font-bold">{receipt.solvedData.evidence.applied}</span></p>}
-                      
-                      {receipt.solvedData.evidence.policy && <p>Policy: <span className="text-gray-400">{receipt.solvedData.evidence.policy}</span></p>}
-                    </div>
-
-                    {/* 4. Case Solved & Flag Unlock */}
-                    {receiptSequence >= 3 && (
-                      <div className="w-full max-w-sm animate-fade-in-up text-center">
-                        <div className="bg-green-50 border-2 border-green-500 p-4 rounded-xl shadow-lg mb-4">
-                          <h3 className="text-green-700 font-black text-xl uppercase tracking-widest mb-1">Case Solved</h3>
-                          <p className="text-green-600 text-sm font-bold">Evidence Verified.</p>
-                        </div>
+                      {/* my-auto ensures the content stays centered but pushes boundaries safely when scrolling on small screens */}
+                      <div className="my-auto w-full max-w-sm flex flex-col items-center">
+                        <p className="text-red-500 font-black tracking-widest uppercase mb-2 text-sm text-center">Suspicious Activity</p>
                         
-                        <div className="bg-gray-100 p-4 rounded-xl border border-gray-300 font-mono text-gray-800 font-black text-lg select-all shadow-inner mb-4">
-                          {receipt.solvedData.flag}
+                        <div className="w-full bg-gray-900 text-gray-300 rounded-xl p-5 sm:p-6 font-mono text-xs sm:text-sm shadow-2xl border border-gray-800 text-left mb-6 break-words">
+                          <p className="text-white border-b border-gray-700 pb-2 mb-4 font-bold uppercase">{receipt.solvedData.evidence.title}</p>
+                          
+                          {receipt.solvedData.evidence.product && <p className="mb-1">Product: <span className="text-gray-400">{receipt.solvedData.evidence.product}</span></p>}
+                          {receipt.solvedData.evidence.before && <p className="mb-1">Expected: <span className="text-gray-500 line-through">{receipt.solvedData.evidence.before}</span></p>}
+                          {receipt.solvedData.evidence.after !== undefined && <p className="mb-1">Processed: <span className="text-red-400 font-bold">{receipt.solvedData.evidence.after}</span></p>}
+                          {receipt.solvedData.evidence.impact && <p className="mt-3 text-[10px] sm:text-xs border-t border-gray-800 pt-3 text-gray-400 leading-relaxed">{receipt.solvedData.evidence.impact}</p>}
+                          
+                          {receipt.solvedData.evidence.requested !== undefined && <p className="mb-1">Requested: <span className="text-red-400 font-bold">{receipt.solvedData.evidence.requested}</span></p>}
+                          {receipt.solvedData.evidence.available !== undefined && <p className="mb-1">Available: <span className="text-gray-400">{receipt.solvedData.evidence.available}</span></p>}
+                          
+                          {receipt.solvedData.evidence.currency && <p className="mb-1">Currency: <span className="text-gray-400">{receipt.solvedData.evidence.currency}</span></p>}
+                          {receipt.solvedData.evidence.expected !== undefined && <p className="mb-1">Expected Rate: <span className="text-gray-400">{receipt.solvedData.evidence.expected}</span></p>}
+                          {receipt.solvedData.evidence.applied && <p className="mb-1">Applied Rate: <span className="text-red-400 font-bold">{receipt.solvedData.evidence.applied}</span></p>}
+                          
+                          {receipt.solvedData.evidence.policy && <p className="mb-1">Policy: <span className="text-gray-400">{receipt.solvedData.evidence.policy}</span></p>}
                         </div>
 
-                        <div className="flex flex-col sm:flex-row gap-3">
-                          <button 
-                            onClick={() => handleCopy(receipt.solvedData.flag)}
-                            className="flex-1 bg-white border border-gray-300 hover:bg-gray-50 text-black font-bold py-3 rounded-lg transition shadow-sm"
-                          >
-                            {copyStatus}
-                          </button>
-                          <a 
-                            href={GOOGLE_FORM_URL} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition shadow-md flex items-center justify-center"
-                          >
-                            Submit Flag ➔
-                          </a>
-                        </div>
+                        {/* 4. Case Solved & Flag Unlock */}
+                        {receiptSequence >= 3 && (
+                          <div className="w-full animate-fade-in-up text-center">
+                            <div className="bg-green-50 border-2 border-green-500 p-4 rounded-xl shadow-lg mb-4">
+                              <h3 className="text-green-700 font-black text-lg sm:text-xl uppercase tracking-widest mb-1">Case Solved</h3>
+                              <p className="text-green-600 text-xs sm:text-sm font-bold">Evidence Verified.</p>
+                            </div>
+                            
+                            <div className="bg-gray-100 p-4 rounded-xl border border-gray-300 font-mono text-gray-800 font-black text-sm sm:text-lg select-all shadow-inner mb-4 break-all">
+                              {receipt.solvedData.flag}
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row gap-3">
+                              <button 
+                                onClick={() => handleCopy(receipt.solvedData.flag)}
+                                className="flex-1 bg-white border border-gray-300 hover:bg-gray-50 text-black font-bold py-3 rounded-lg transition shadow-sm"
+                              >
+                                {copyStatus}
+                              </button>
+                              <a 
+                                href={GOOGLE_FORM_URL} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition shadow-md flex items-center justify-center"
+                              >
+                                Submit Flag ➔
+                              </a>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
 
                 {/* Normal Process - No Vulnerability Triggered */}
                 {receiptSequence >= 1 && !receipt.solvedData && (
-                   <div className="absolute inset-0 flex flex-col items-center justify-center z-10 animate-fade-in bg-white/95">
+                   <div className="absolute inset-x-0 top-0 bottom-16 flex flex-col items-center justify-center z-10 animate-fade-in bg-white/95 backdrop-blur-md rounded-xl">
                      <h2 className="text-2xl font-black text-gray-900 mb-2">No anomaly detected.</h2>
                      <p className="text-gray-500 font-bold text-sm">Try another parameter.</p>
                    </div>
                 )}
 
-                <button
-                  onClick={resetOrder}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-3 rounded-xl font-bold transition border border-gray-200 mt-4 relative z-0"
-                >
-                  Start New Order
-                </button>
+                {/* Start New Order strictly anchored to the bottom and placed ON TOP of absolute overlays */}
+                <div className="mt-auto pt-4 relative z-30">
+                  <button
+                    onClick={resetOrder}
+                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-3 rounded-xl font-bold transition border border-gray-200 shadow-sm"
+                  >
+                    Start New Order
+                  </button>
+                </div>
+
               </div>
             )}
             
-            <div className="absolute bottom-[-30px] right-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              Practice Lab • Authorized Testing Only
-            </div>
+          </div>
+          
+          <div className="text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">
+            Practice Lab • Authorized Testing Only
           </div>
         </div>
 
@@ -422,6 +434,11 @@ export default function PriceManipulation() {
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         .animate-fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
+        
+        /* Custom scrollbar to keep evidence panel clean on Windows/Android */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 20px; }
       `}</style>
     </div>
   );
