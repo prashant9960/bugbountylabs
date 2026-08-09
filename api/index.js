@@ -1,4 +1,6 @@
-// 1. Import all the unmodified files from your backend folder
+// api/index.js
+
+// Import backend handlers
 import adminDashboard from '../backend/v1/admin/dashboard.js';
 import adminData from '../backend/admin-data.js';
 import bookSeat from '../backend/book-seat.js';
@@ -12,66 +14,121 @@ import ordersLab from '../backend/orders-lab.js';
 import searchXss from '../backend/search-xss.js';
 import trackOrder from '../backend/track-order.js';
 import verifyOtp from '../backend/verify-otp.js';
+
 import handlePreATO from '../backend/pre-ato.js';
 import handleCaptchaFailOpen from '../backend/captcha-fail-open.js';
 import handleSubdomainTakeover from '../backend/subdomain-takeover.js';
 import handleInfoDisclosure from '../backend/info-disclosure.js';
 import handleJwtAlgNone from '../backend/jwt-alg-none.js';
-import adminDataHandler from '../backend/admin-data.js';
-import verifyOtpHandler from '../backend/verify-otp.js';
-import checkoutHandler from '../backend/checkout.js';
 
 export default async function handler(req, res) {
-  // Extract the base URL without query parameters
+  // Remove query parameters from the request path
   const urlPath = req.url.split('?')[0];
 
-  // 2. Route the request to the exact file it belongs to
+  // ============================================================
+  // STATIC API ROUTES
+  // ============================================================
   switch (urlPath) {
-    case '/api/v1/admin/dashboard': return adminDashboard(req, res);
-    case '/api/admin-data': return adminData(req, res);
-    case '/api/book-seat': return bookSeat(req, res);
-    case '/api/cancel-order': return cancelOrder(req, res);
-    case '/api/check-graphql-progress': return checkGraphqlProgress(req, res);
-    case '/api/check-race-progress': return checkRaceProgress(req, res);
-    case '/api/check-xss-progress': return checkXssProgress(req, res);
-    case '/api/checkout': return checkout(req, res);
-    case '/api/graphql': return graphql(req, res);
-    case '/api/orders-lab': return ordersLab(req, res);
-    case '/api/search-xss': return searchXss(req, res);
-    case '/api/track-order': return trackOrder(req, res);
-    case '/api/verify-otp': return verifyOtp(req, res);
+
+    // ----------------------------
+    // Admin / OTP Lab
+    // ----------------------------
+    case '/api/v1/admin/dashboard':
+      return adminDashboard(req, res);
+
+    case '/api/v1/admin-data':
+      return adminData(req, res);
+
+    case '/api/v1/verify-otp':
+      return verifyOtp(req, res);
+
+    // Backward-compatible routes
+    case '/api/admin-data':
+      return adminData(req, res);
+
+    case '/api/verify-otp':
+      return verifyOtp(req, res);
+
+    // ----------------------------
+    // Price Manipulation
+    // ----------------------------
+    case '/api/checkout':
+      return checkout(req, res);
+
+    // ----------------------------
+    // Seat / Race Condition
+    // ----------------------------
+    case '/api/book-seat':
+      return bookSeat(req, res);
+
+    case '/api/cancel-order':
+      return cancelOrder(req, res);
+
+    case '/api/check-race-progress':
+      return checkRaceProgress(req, res);
+
+    // ----------------------------
+    // GraphQL
+    // ----------------------------
+    case '/api/graphql':
+      return graphql(req, res);
+
+    case '/api/check-graphql-progress':
+      return checkGraphqlProgress(req, res);
+
+    // ----------------------------
+    // XSS
+    // ----------------------------
+    case '/api/search-xss':
+      return searchXss(req, res);
+
+    case '/api/check-xss-progress':
+      return checkXssProgress(req, res);
+
+    // ----------------------------
+    // IDOR / Orders
+    // ----------------------------
+    case '/api/orders-lab':
+      return ordersLab(req, res);
+
+    case '/api/track-order':
+      return trackOrder(req, res);
+
+    // ----------------------------
+    // Other Labs
+    // ----------------------------
+    case '/api/pre-ato':
+    case '/api/check-pre-ato-progress':
+      return handlePreATO(req, res);
+
+    case '/api/captcha-fail-open':
+    case '/api/check-captcha-progress':
+      return handleCaptchaFailOpen(req, res);
+
+    case '/api/subdomain-takeover':
+    case '/api/check-subdomain-progress':
+      return handleSubdomainTakeover(req, res);
+
+    case '/api/info-disclosure':
+      return handleInfoDisclosure(req, res);
+
+    case '/api/jwt-alg-none':
+      return handleJwtAlgNone(req, res);
   }
 
-  // Handle dynamic routing for the IDOR lab (e.g., /api/orders/5001)
+  // ============================================================
+  // DYNAMIC IDOR ROUTING
+  // Example:
+  // /api/orders/5001
+  // ============================================================
   if (urlPath.startsWith('/api/orders/')) {
     return ordersLab(req, res);
   }
-  if (urlPath === '/api/pre-ato' || urlPath === '/api/check-pre-ato-progress') {
-    return handlePreATO(req, res);
-  }
-  if (urlPath === '/api/captcha-fail-open' || urlPath === '/api/check-captcha-progress') {
-    return handleCaptchaFailOpen(req, res);
-  }
-  if (urlPath === '/api/subdomain-takeover' || urlPath === '/api/check-subdomain-progress') {
-    return handleSubdomainTakeover(req, res);
-  }
-  if (urlPath === '/api/info-disclosure') {
-    return handleInfoDisclosure(req, res);
-  }
-  if (urlPath === '/api/jwt-alg-none') {
-    return handleJwtAlgNone(req, res);
-  }
-  if (path.endsWith('/admin-data')) {
-    return adminDataHandler(req, res);
-  } 
-  
-  if (path.endsWith('/verify-otp')) {
-    return verifyOtpHandler(req, res);
-  } 
-  
-  if (path.endsWith('/checkout')) {
-    return checkoutHandler(req, res);
-  }
-  // Fallback
-  return res.status(404).json({ error: "API Endpoint not found." });
+
+  // ============================================================
+  // FALLBACK
+  // ============================================================
+  return res.status(404).json({
+    error: 'API Endpoint not found.'
+  });
 }
