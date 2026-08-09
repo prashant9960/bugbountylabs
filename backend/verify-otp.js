@@ -1,34 +1,40 @@
+// backend/v1/verify-otp.js
+
 export default async function handler(req, res) {
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
-    }
-  
-    // Network realism delay
-    await new Promise(resolve => setTimeout(resolve, 400));
-  
-    const { otp } = req.body;
-  
-    // The true OTP is unknown to the user, forcing them to intercept the 403 response.
-    if (otp === "827394") {
-      return res.status(200).json({
-        success: true,
-        verified: true,
-        role: "admin",
-        // Highly realistic JWT structure
-        session: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTcxNjIzOTAyMiwiZXhwIjoxNzE2MzI1NDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
-        expires: "2026-07-26T12:00:00Z",
-        redirect: "/admin/dashboard",
-        message: "Login successful."
-      });
-    }
-  
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 400));
+
+  const { email, otp } = req.body;
+
+  if (!email || email !== "admin@vcorp.local") {
     return res.status(403).json({
       success: false,
       verified: false,
-      role: "guest",
-      session: null,
-      expires: null,
-      redirect: null,
-      message: "Invalid OTP. Authentication failed."
+      message: "Account not found or access restricted."
     });
   }
+
+  // LAB FLOW IDENTIFIER (Not a secure auth token)
+  // This is a stateless 2-minute context used to bridge the UI transition.
+  const labFlowContext = Buffer.from(`${email}:${Date.now()}`).toString('base64');
+
+  // Hardcoded sandbox OTP
+  if (otp === "827394") {
+    return res.status(200).json({
+      success: true,
+      verified: true,
+      session: labFlowContext,
+      message: "Login successful."
+    });
+  }
+
+  return res.status(403).json({
+    success: false,
+    verified: false,
+    session: labFlowContext, 
+    message: "Invalid OTP. Authentication failed."
+  });
+}
