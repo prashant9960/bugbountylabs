@@ -17,6 +17,9 @@ import handleCaptchaFailOpen from '../backend/captcha-fail-open.js';
 import handleSubdomainTakeover from '../backend/subdomain-takeover.js';
 import handleInfoDisclosure from '../backend/info-disclosure.js';
 import handleJwtAlgNone from '../backend/jwt-alg-none.js';
+import adminDataHandler from '../backend/admin-data.js';
+import verifyOtpHandler from '../backend/verify-otp.js';
+import checkoutHandler from '../backend/checkout.js';
 
 export default async function handler(req, res) {
   // Extract the base URL without query parameters
@@ -57,6 +60,17 @@ export default async function handler(req, res) {
   }
   if (urlPath === '/api/jwt-alg-none') {
     return handleJwtAlgNone(req, res);
+  }
+  if (path.endsWith('/admin-data')) {
+    return adminDataHandler(req, res);
+  } 
+  
+  if (path.endsWith('/verify-otp')) {
+    return verifyOtpHandler(req, res);
+  } 
+  
+  if (path.endsWith('/checkout')) {
+    return checkoutHandler(req, res);
   }
   // Fallback
   return res.status(404).json({ error: "API Endpoint not found." });
